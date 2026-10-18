@@ -41,10 +41,26 @@ test("createRequest trims input and adds system fields", () => {
     requester: "Jordan Lee",
     department: "Operations",
     equipment: "Laptop",
+    priority: "Normal",
     neededBy: "2026-09-15",
     reason: "Replace a failed field computer.",
     createdAt: "2026-08-17T12:00:00.000Z",
   });
+});
+
+test("createRequest keeps a selected priority", () => {
+  assert.equal(createRequest({ ...validInput, priority: "High" }).priority, "High");
+});
+
+test("createRequest rejects unsupported priorities", () => {
+  assert.throws(
+    () => createRequest({ ...validInput, priority: "Urgent" }),
+    (error) => {
+      assert.ok(error instanceof RequestValidationError);
+      assert.equal(error.errors.priority, "Select a valid priority.");
+      return true;
+    },
+  );
 });
 
 test("createRequest reports missing required fields", () => {
@@ -83,4 +99,16 @@ test("loadRequests safely handles damaged stored data", () => {
   storage.setItem(STORAGE_KEY, "not-json");
 
   assert.deepEqual(loadRequests(storage), []);
+});
+
+test("loadRequests assigns Normal to older requests without priority", () => {
+  const storage = new MemoryStorage();
+  const legacyRequest = createRequest(validInput, {
+    id: "legacy-request",
+    now: new Date("2026-08-17T12:00:00.000Z"),
+  });
+  delete legacyRequest.priority;
+  storage.setItem(STORAGE_KEY, JSON.stringify([legacyRequest]));
+
+  assert.deepEqual(loadRequests(storage), [{ ...legacyRequest, priority: "Normal" }]);
 });

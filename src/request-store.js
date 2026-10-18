@@ -12,12 +12,17 @@ function clean(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+const PRIORITIES = ["Low", "Normal", "High"];
+
 export function validateRequest(input = {}) {
   const errors = {};
 
   if (!clean(input.requester)) errors.requester = "Enter the requester name.";
   if (!clean(input.department)) errors.department = "Select a department.";
   if (!clean(input.equipment)) errors.equipment = "Enter the equipment needed.";
+  if (!PRIORITIES.includes(clean(input.priority || "Normal"))) {
+    errors.priority = "Select a valid priority.";
+  }
   if (!clean(input.neededBy)) errors.neededBy = "Select the date needed.";
   if (!clean(input.reason)) errors.reason = "Enter a business reason.";
 
@@ -42,6 +47,7 @@ export function createRequest(input, options = {}) {
     requester: clean(input.requester),
     department: clean(input.department),
     equipment: clean(input.equipment),
+    priority: clean(input.priority || "Normal"),
     neededBy: clean(input.neededBy),
     reason: clean(input.reason),
     createdAt: now.toISOString(),
@@ -60,7 +66,12 @@ export function loadRequests(storage = globalThis.localStorage) {
     if (!stored) return [];
 
     const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) ? parsed.filter(isRequestRecord) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter(isRequestRecord).map((request) => ({
+          ...request,
+          priority: request.priority ?? "Normal",
+        }))
+      : [];
   } catch {
     return [];
   }
@@ -79,6 +90,7 @@ function isRequestRecord(value) {
     typeof value.requester === "string" &&
     typeof value.department === "string" &&
     typeof value.equipment === "string" &&
+    (value.priority === undefined || PRIORITIES.includes(value.priority)) &&
     typeof value.neededBy === "string" &&
     typeof value.reason === "string" &&
     typeof value.createdAt === "string"
