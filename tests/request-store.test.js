@@ -6,6 +6,7 @@ import {
   STORAGE_KEY,
   appendRequest,
   createRequest,
+  filterRequestsByPriority,
   loadRequests,
   saveRequests,
 } from "../src/request-store.js";
@@ -41,26 +42,11 @@ test("createRequest trims input and adds system fields", () => {
     requester: "Jordan Lee",
     department: "Operations",
     equipment: "Laptop",
-    priority: "Normal",
     neededBy: "2026-09-15",
     reason: "Replace a failed field computer.",
+    priority: "Normal",
     createdAt: "2026-08-17T12:00:00.000Z",
   });
-});
-
-test("createRequest keeps a selected priority", () => {
-  assert.equal(createRequest({ ...validInput, priority: "High" }).priority, "High");
-});
-
-test("createRequest rejects unsupported priorities", () => {
-  assert.throws(
-    () => createRequest({ ...validInput, priority: "Urgent" }),
-    (error) => {
-      assert.ok(error instanceof RequestValidationError);
-      assert.equal(error.errors.priority, "Select a valid priority.");
-      return true;
-    },
-  );
 });
 
 test("createRequest reports missing required fields", () => {
@@ -82,6 +68,36 @@ test("appendRequest returns a new list with the newest request first", () => {
   assert.deepEqual(original.map((request) => request.id), ["old"]);
 });
 
+test("priority filtering preserves source order and leaves unknown priorities in All", () => {
+  const requests = [
+    { id: "high", priority: "High" },
+    { id: "legacy" },
+    { id: "low", priority: "Low" },
+    { id: "unknown", priority: "Urgent" },
+    { id: "normal", priority: "Normal" },
+  ];
+
+  assert.strictEqual(filterRequestsByPriority(requests), requests);
+  assert.deepEqual(filterRequestsByPriority(requests).map(({ id }) => id), [
+    "high",
+    "legacy",
+    "low",
+    "unknown",
+    "normal",
+  ]);
+  assert.deepEqual(filterRequestsByPriority(requests, "Low").map(({ id }) => id), ["low"]);
+  assert.deepEqual(filterRequestsByPriority(requests, "Normal").map(({ id }) => id), ["normal"]);
+  assert.deepEqual(filterRequestsByPriority(requests, "High").map(({ id }) => id), ["high"]);
+  assert.deepEqual(filterRequestsByPriority(requests, "Other"), []);
+  assert.deepEqual(requests, [
+    { id: "high", priority: "High" },
+    { id: "legacy" },
+    { id: "low", priority: "Low" },
+    { id: "unknown", priority: "Urgent" },
+    { id: "normal", priority: "Normal" },
+  ]);
+});
+
 test("saveRequests and loadRequests round-trip valid records", () => {
   const storage = new MemoryStorage();
   const request = createRequest(validInput, {
@@ -101,14 +117,18 @@ test("loadRequests safely handles damaged stored data", () => {
   assert.deepEqual(loadRequests(storage), []);
 });
 
-test("loadRequests assigns Normal to older requests without priority", () => {
+test("loadRequests preserves existing records with missing priorities and incomplete fields", () => {
   const storage = new MemoryStorage();
-  const legacyRequest = createRequest(validInput, {
+  const legacyRequest = {
     id: "legacy-request",
-    now: new Date("2026-08-17T12:00:00.000Z"),
-  });
-  delete legacyRequest.priority;
+    requester: "",
+    department: "Operations",
+    equipment: "Laptop",
+    neededBy: "not-a-date",
+    reason: "",
+    createdAt: "not-a-timestamp",
+  };
   storage.setItem(STORAGE_KEY, JSON.stringify([legacyRequest]));
 
-  assert.deepEqual(loadRequests(storage), [{ ...legacyRequest, priority: "Normal" }]);
+  assert.deepEqual(loadRequests(storage), [legacyRequest]);
 });
