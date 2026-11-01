@@ -6,6 +6,7 @@ import {
   loadRequests,
   saveRequests,
 } from "./request-store.js";
+import { getEmptyStateCopy } from "./request-view.js";
 
 const form = document.querySelector("#request-form");
 const message = document.querySelector("#form-message");
@@ -56,11 +57,11 @@ form.addEventListener("submit", (event) => {
 function renderRequests() {
   const visibleRequests = filterRequestsByPriority(requests, priorityFilter.value);
   const hasRequests = visibleRequests.length > 0;
-  const noRequestsAtAll = requests.length === 0;
+  const emptyStateCopy = getEmptyStateCopy(requests.length, priorityFilter.value);
   count.textContent = `${visibleRequests.length} ${visibleRequests.length === 1 ? "request" : "requests"}`;
   emptyState.hidden = hasRequests;
-  emptyStateTitle.textContent = noRequestsAtAll ? "No requests yet" : "No requests were found.";
-  emptyStateMessage.hidden = !noRequestsAtAll;
+  emptyStateTitle.textContent = emptyStateCopy.title;
+  emptyStateMessage.hidden = !emptyStateCopy.showAddRequestMessage;
   tableWrapper.hidden = !hasRequests;
   tableBody.replaceChildren(...visibleRequests.map(createRequestRow));
 }
